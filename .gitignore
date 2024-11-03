@@ -28,7 +28,6 @@ Thumbs.db
 
 # Ignore Visual Studio Code settings
 .vscode/
-.gitignore
 
 # Ignore OS generated files
 *.swp
