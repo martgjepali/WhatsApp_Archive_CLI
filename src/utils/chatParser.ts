@@ -1,7 +1,6 @@
 // chatParse.ts
 
 import fs from "fs";
-import moment from "moment";
 import { createHash } from "crypto";
 import path from "path";
 import { convertOpusToMp3 } from "./convertOpusToMp3";
@@ -57,7 +56,7 @@ async function parseChatContent(
 
   // Update this regex based on your chat transcript's date format
   const dateRegex =
-    /^\[(\d{1,2})\.(\d{1,2})\.(\d{2}), (\d{1,2}):(\d{2}):(\d{2})\]/;
+    /^\[(\d{1,2})[./-](\d{1,2})[./-](\d{2}|\d{4}), (\d{1,2}):(\d{2}):(\d{2})\]/;
 
   for (const line of lines) {
     console.log(`Processing line: ${line}`); // Diagnostic log
@@ -68,20 +67,29 @@ async function parseChatContent(
       console.log(`Matched date: ${match[0]}`); // Diagnostic log
 
       const [_, day, month, year, hour, minute, second] = match;
-      const date = moment(
-        `20${year}-${month}-${day} ${hour}:${minute}:${second}`,
-        "YYYY-MM-DD HH:mm:ss"
+      const fullYear = year.length === 2 ? `20${year}` : year;
+
+      const parsedDate = new Date(
+        `${fullYear}-${month.padStart(2, "0")}-${day.padStart(
+          2,
+          "0"
+        )}T${hour.padStart(2, "0")}:${minute.padStart(
+          2,
+          "0"
+        )}:${second.padStart(2, "0")}Z`
       );
-      const timestamp = date.unix();
-      const normalizedLine = line.replace(dateRegex, "").trim(); // Remove timestamp
+
+      if (isNaN(parsedDate.getTime())) {
+        console.warn(`Warning: Invalid date in line, skipping: ${line}`);
+        continue;
+      }
+
+      const timestamp = Math.floor(parsedDate.getTime() / 1000);
+      const normalizedLine = line.replace(dateRegex, "").trim();
 
       lastTimestamp = timestamp;
-      // Ensure hour is zero-padded
-      const formattedHour = `${hour.padStart(2, "0")}:${minute.padStart(
-        2,
-        "0"
-      )}`;
-      lastHour = formattedHour;
+
+      lastHour = `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
 
       const attachmentMatch = normalizedLine.match(/<attached: (.+)>/);
       if (attachmentMatch) {
@@ -166,18 +174,22 @@ async function parseChatContent(
 
           if (!isGroupChat && !fromMe) inferredChatName = person;
 
-          if (dayCache !== date.format("YYYY-MM-DD")) {
-            dayCache = date.format("YYYY-MM-DD");
+          if (dayCache !== parsedDate.toISOString().split("T")[0]) {
+            dayCache = parsedDate.toISOString().split("T")[0];
             chatMessages.push({
               type: "dchange",
               index: msgIndex++,
               tstamp: timestamp,
-              date: date.format("D MMMM YYYY"),
-              message: `Date changed to ${date.format("D MMMM YYYY")}`,
+              date: parsedDate.toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              }),
+              message: `Date changed to ${parsedDate.toLocaleDateString(
+                "en-US",
+                { year: "numeric", month: "long", day: "numeric" }
+              )}`,
             });
-            console.log(
-              `Added date change message for: ${date.format("D MMMM YYYY")}`
-            ); // Diagnostic log
           }
 
           chatMessages.push({
