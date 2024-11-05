@@ -1,5 +1,3 @@
-// chatParse.ts
-
 import fs from "fs";
 import { createHash } from "crypto";
 import path from "path";
@@ -29,21 +27,29 @@ export async function parseChatFile(
   filePath: string,
   meHash: string,
   isGroupChat: boolean,
-  outputPath: string
+  outputPath: string,
+  convertOpus: boolean // Add convertOpus parameter
 ): Promise<ChatLog> {
   if (!fs.existsSync(filePath)) {
     throw new Error("Input file does not exist");
   }
 
   const content = fs.readFileSync(filePath, "utf8");
-  return parseChatContent(content, meHash, isGroupChat, outputPath);
+  return parseChatContent(
+    content,
+    meHash,
+    isGroupChat,
+    outputPath,
+    convertOpus // Pass convertOpus to parseChatContent
+  );
 }
 
 async function parseChatContent(
   content: string,
   meHash: string,
   isGroupChat: boolean,
-  outputPath: string
+  outputPath: string,
+  convertOpus: boolean
 ): Promise<ChatLog> {
   const lines = content.split("\n");
   const chatMessages: ChatMessage[] = [];
@@ -103,7 +109,7 @@ async function parseChatContent(
         const ext = path.extname(originalAttachmentPath).toLowerCase();
         let finalAttachmentPath = originalAttachmentPath;
 
-        if (ext === ".opus") {
+        if (ext === ".opus" && convertOpus) {
           // Define the path for the converted MP3 file
           finalAttachmentPath = originalAttachmentPath.replace(
             /\.opus$/i,
@@ -111,29 +117,21 @@ async function parseChatContent(
           );
 
           try {
-            console.log(`Converting ${originalAttachmentPath} to MP3...`); // Diagnostic log
+            console.log(`Converting ${originalAttachmentPath} to MP3...`);
             await convertOpusToMp3(originalAttachmentPath, finalAttachmentPath);
-          } catch (conversionError: unknown) {
-            if (conversionError instanceof Error) {
-              console.error(`Conversion failed: ${conversionError.message}`);
-            } else {
-              console.error("An unknown error occurred during conversion.");
-            }
-            // Optionally, you can choose to skip adding this attachment or add it with an error message
+          } catch (error) {
+            console.error(
+              `Conversion failed for ${originalAttachmentPath}: ${error}`
+            );
             chatMessages.push({
               type: "msg",
               index: msgIndex++,
-              tstamp: timestamp,
-              hour: lastHour,
-              person: lastPerson, // Use the last known sender
+              tstamp: lastTimestamp,
               message: "Media file attached (conversion failed)",
-              attachment: originalAttachmentPath, // Reference original if conversion failed
+              attachment: originalAttachmentPath,
             });
-            continue; // Skip to the next line
+            continue;
           }
-
-          // Optionally, remove the original .opus file after conversion
-          // fs.unlinkSync(originalAttachmentPath);
         }
 
         // Verify if the attachment file exists
@@ -225,7 +223,7 @@ async function parseChatContent(
         const ext = path.extname(originalAttachmentPath).toLowerCase();
         let finalAttachmentPath = originalAttachmentPath;
 
-        if (ext === ".opus") {
+        if (ext === ".opus" && convertOpus) {
           // Define the path for the converted MP3 file
           finalAttachmentPath = originalAttachmentPath.replace(
             /\.opus$/i,
