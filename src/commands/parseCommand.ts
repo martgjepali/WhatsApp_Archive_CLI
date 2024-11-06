@@ -20,16 +20,17 @@ export function registerParseCommand(program: Command): void {
     .option("-m, --me <hash>", "Specify your unique hash identifier")
     .option("-g, --group", "Indicate if the chat is a group chat", false)
     .option("--convert-opus", "Convert OPUS files to MP3", false)
+    .option("--no-media", "Exclude media files from the saved output", false) // Add no-media option
     .option(
       "--convert-to <format>",
       "Output format: json, txt, or html",
       "json"
-    ) // Add convert-to option
+    )
     .addHelpText(
       "after",
       `
 Examples:
-  $ cli-tool parse --input ./chat.zip --output ./output --me <hash> --group --convert-opus --convert-to html
+  $ cli-tool parse --input ./chat.zip --output ./output --me <hash> --group --convert-opus --convert-to html --no-media
   $ cli-tool parse --input /path/to/chat.zip --output /path/to/output --convert-to txt
     `
     )
@@ -70,7 +71,8 @@ Examples:
           options.me,
           options.group,
           outputPath,
-          options.convertOpus
+          options.convertOpus,
+          options.noMedia
         );
 
         // Save the parsed output in the specified format

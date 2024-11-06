@@ -28,7 +28,8 @@ export async function parseChatFile(
   meHash: string,
   isGroupChat: boolean,
   outputPath: string,
-  convertOpus: boolean // Add convertOpus parameter
+  convertOpus: boolean,
+  noMedia: boolean
 ): Promise<ChatLog> {
   if (!fs.existsSync(filePath)) {
     throw new Error("Input file does not exist");
@@ -40,7 +41,8 @@ export async function parseChatFile(
     meHash,
     isGroupChat,
     outputPath,
-    convertOpus // Pass convertOpus to parseChatContent
+    convertOpus,
+    noMedia
   );
 }
 
@@ -49,7 +51,8 @@ async function parseChatContent(
   meHash: string,
   isGroupChat: boolean,
   outputPath: string,
-  convertOpus: boolean
+  convertOpus: boolean,
+  noMedia: boolean
 ): Promise<ChatLog> {
   const lines = content.split("\n");
   const chatMessages: ChatMessage[] = [];
