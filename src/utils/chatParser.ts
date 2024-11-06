@@ -3,7 +3,7 @@ import { createHash } from "crypto";
 import path from "path";
 import { convertOpusToMp3 } from "./convertOpusToMp3";
 
-type ChatMessage = {
+export type ChatMessage = {
   type: "msg" | "dchange" | "notification";
   index: number;
   tstamp: number;
@@ -15,7 +15,7 @@ type ChatMessage = {
   attachment?: string; // Optional field for attachments
 };
 
-type ChatLog = {
+export type ChatLog = {
   groupChat: boolean;
   chatName: string;
   me: string;
