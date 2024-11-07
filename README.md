@@ -67,7 +67,7 @@ npm run dev -- parse --input <path_to_zip> --output <output_directory> [options]
 1. **Basic Extraction**
 
    ```bash
-   npm run dev -- parse --input ./files/whatsapp-archive.zip --output ./output --me JohnDoe --group
+   npm run dev -- parse --input ./files/test_file.zip --output ./output --me JohnDoe --group
    ```
 
    This command will extract the chat data from the specified ZIP archive and output it along with any media conversions into the `./output` directory. The `--me` flag accepts a name, and the application will generate an MD5 hash for it.
@@ -75,7 +75,7 @@ npm run dev -- parse --input <path_to_zip> --output <output_directory> [options]
 2. **Conversion to HTML**
 
    ```bash
-   npm run dev -- parse --input ./files/whatsapp-archive.zip --output ./output --convert-to html
+   npm run dev -- parse --input ./files/test_file.zip --output ./output --convert-to html
    ```
 
    This command will extract the chat transcript and output it in HTML format.
@@ -83,7 +83,7 @@ npm run dev -- parse --input <path_to_zip> --output <output_directory> [options]
 3. **Exclude Media Files**
 
    ```bash
-   npm run dev -- parse --input ./files/whatsapp-archive.zip --output ./output --exclude-media
+   npm run dev -- parse --input ./files/test_file.zip --output ./output --exclude-media
    ```
 
    This command will exclude any media files from the output.
@@ -103,13 +103,13 @@ The output directory should be a directory that you create in the root folder of
 - **Run**: Execute the compiled JavaScript code:
 
   ```bash
-  npm run start -- parse --input ./files/whatsapp-archive.zip --output ./output
+  npm run start -- parse --input ./files/test_file.zip --output ./output
   ```
 
 - **Development Mode**: Run the tool with TypeScript directly (without compiling first):
 
   ```bash
-  npm run dev -- parse --input ./files/whatsapp-archive.zip --output ./output
+  npm run dev -- parse --input ./files/test_file.zip --output ./output
   ```
 
 ### Testing
