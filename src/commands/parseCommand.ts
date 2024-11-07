@@ -4,6 +4,11 @@ import path from "path";
 import AdmZip from "adm-zip";
 import { parseChatFile } from "../utils/chatParser";
 import { ChatLog, ChatMessage } from "../utils/chatParser";
+import crypto from "crypto";
+
+export function createMd5Hash(value: string): string {
+  return crypto.createHash("md5").update(value).digest("hex");
+}
 
 export function registerParseCommand(program: Command): void {
   program
@@ -18,6 +23,7 @@ export function registerParseCommand(program: Command): void {
       "Path to the output folder where the results will be saved"
     )
     .option("-m, --me <hash>", "Specify your unique hash identifier")
+    .option("-n, --name <name>", "Specify your name to generate the hash")
     .option("-g, --group", "Indicate if the chat is a group chat", false)
     .option(
       "--convert-to <format>",
@@ -42,7 +48,15 @@ Examples:
     )
     .action(async (options) => {
       try {
-        // Debugging: Log all options to see what values are being received
+        if (options.name) {
+          console.log(`Generating hash for name: ${options.name}`);
+          options.me = createMd5Hash(options.name);
+        } else if (!options.me) {
+          // If no hash or name is provided, use a default
+          console.warn("No name or hash provided, using a default identifier.");
+          options.me = createMd5Hash("default_user");
+        }
+
         console.log("Received options:", options);
 
         const inputPath = path.resolve(options.input);
@@ -184,32 +198,45 @@ function generateHtmlContent(chatLog: ChatLog, excludeMedia: boolean): string {
         const webFriendlyAttachmentPath = msg.attachment.replace(/\\/g, "/");
 
         // Handle audio or image attachments
-        const isAudio = webFriendlyAttachmentPath.toLowerCase().endsWith(".mp3");
-        const isImage = webFriendlyAttachmentPath.toLowerCase().endsWith(".jpg") ||
-                        webFriendlyAttachmentPath.toLowerCase().endsWith(".jpeg") ||
-                        webFriendlyAttachmentPath.toLowerCase().endsWith(".png");
+        const isAudio = webFriendlyAttachmentPath
+          .toLowerCase()
+          .endsWith(".mp3");
+        const isImage =
+          webFriendlyAttachmentPath.toLowerCase().endsWith(".jpg") ||
+          webFriendlyAttachmentPath.toLowerCase().endsWith(".jpeg") ||
+          webFriendlyAttachmentPath.toLowerCase().endsWith(".png");
 
         if (excludeMedia) {
-          return `<p><i>${dateStr}</i> - <b>${msg.person || ""}</b>: [Media file not saved]</p>`;
+          return `<p><i>${dateStr}</i> - <b>${
+            msg.person || ""
+          }</b>: [Media file not saved]</p>`;
         } else if (isAudio) {
           return `
           <figure>
-            <figcaption><i>${dateStr}</i> - <b>${msg.person || ""}</b></figcaption>
+            <figcaption><i>${dateStr}</i> - <b>${
+            msg.person || ""
+          }</b></figcaption>
             <audio controls><source src="${webFriendlyAttachmentPath}" type="audio/mpeg"></audio>
           </figure>`;
         } else if (isImage) {
           return `
           <figure>
-            <figcaption><i>${dateStr}</i> - <b>${msg.person || ""}</b></figcaption>
+            <figcaption><i>${dateStr}</i> - <b>${
+            msg.person || ""
+          }</b></figcaption>
             <img src="${webFriendlyAttachmentPath}" alt="${webFriendlyAttachmentPath}">
           </figure>`;
         } else {
           // Generic attachment message if the media type is unknown
-          return `<p><i>${dateStr}</i> - <b>${msg.person || ""}</b>: [Attachment] ${webFriendlyAttachmentPath}</p>`;
+          return `<p><i>${dateStr}</i> - <b>${
+            msg.person || ""
+          }</b>: [Attachment] ${webFriendlyAttachmentPath}</p>`;
         }
       } else {
         // Regular message
-        return `<p><i>${dateStr}</i> - <b>${msg.person || ""}</b>: ${msg.message}</p>`;
+        return `<p><i>${dateStr}</i> - <b>${msg.person || ""}</b>: ${
+          msg.message
+        }</p>`;
       }
     })
     .join("\n");
@@ -228,7 +255,6 @@ function generateHtmlContent(chatLog: ChatLog, excludeMedia: boolean): string {
 </html>
   `;
 }
-
 
 export function extractZipArchive(inputPath: string, outputPath: string): void {
   try {

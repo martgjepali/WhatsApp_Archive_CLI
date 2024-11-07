@@ -4,9 +4,11 @@ WhatsApp Archive CLI is a command-line tool designed to extract WhatsApp chat tr
 
 ## Features
 
-- **Extract Chat Transcripts**: Convert WhatsApp chat archives into readable JSON format.
+- **Extract Chat Transcripts**: Convert WhatsApp chat archives into readable formats (JSON, HTML, TXT).
 - **Media File Conversion**: Convert `.opus` files to `.mp3` for broader compatibility.
+- **Exclude Media**: Optionally exclude media files from output.
 - **Customizable Output**: Configure output directories for extracted and converted files.
+- **User-friendly Hash Generation**: Generate MD5 hash identifiers for user messages automatically.
 
 ## Getting Started
 
@@ -29,7 +31,7 @@ Follow these steps to get your development environment running:
 
 2. **Copying zip folder to tests folder**
 
-   When you open the project in the root folder you need to create a directory called ./files in which you must paste your test files and zip files.
+   When you open the project in the root folder, you need to create a directory called `./files` in which you must paste your test files and ZIP files.
 
 3. **Building the Project**
 
@@ -41,19 +43,89 @@ Follow these steps to get your development environment running:
 
    This step compiles the TypeScript code into executable JavaScript code in the dist directory.
 
-4. **Usage**
-   To use the WhatsApp Archive CLI, you need to run the parse command with appropriate options:
+### Usage
+
+To use the WhatsApp Archive CLI, run the `parse` command with appropriate options:
+
+```bash
+npm run dev -- parse --input <path_to_zip> --output <output_directory> [options]
+```
+
+### Command Options
+
+- `--input <path>` (required): Path to the ZIP archive containing the chat transcript and media files.
+- `--output <path>` (required): Path to the output folder where the results will be saved.
+- `-m, --me <name>`: Specify your unique name. An MD5 hash will be automatically generated for identification purposes.
+- `-g, --group`: Indicate if the chat is a group chat (default: `false`).
+- `--convert-to <format>`: Output format (`json`, `txt`, or `html`). Default is `json`.
+- `--convert-opus`: Convert OPUS files to MP3 (default: `false`).
+- `--exclude-media`: Exclude media files from the saved output (default: `false`).
+- `--test-flag`: Test if this flag works correctly (default: `false`).
+
+### Examples
+
+1. **Basic Extraction**
 
    ```bash
-   node dist/index.js parse --input <path_to_zip> --output <output_directory> --me <your_md5_hash> --group
+   npm run dev -- parse --input ./files/whatsapp-archive.zip --output ./output --me JohnDoe --group
    ```
 
-   The output directory is a directory that you create on the root folder of your project usually called ./output
+   This command will extract the chat data from the specified ZIP archive and output it along with any media conversions into the `./output` directory. The `--me` flag accepts a name, and the application will generate an MD5 hash for it.
 
-   example:
+2. **Conversion to HTML**
 
    ```bash
-   npm run dev -- parse --input ./files/whatsapp-archive.zip --output ./output --me 16fa493f8783742fa88597f022f9df07 --group
+   npm run dev -- parse --input ./files/whatsapp-archive.zip --output ./output --convert-to html
    ```
 
-   This command will extract the chat data from the specified ZIP archive and output it along with any media conversions into the ./output directory.
+   This command will extract the chat transcript and output it in HTML format.
+
+3. **Exclude Media Files**
+
+   ```bash
+   npm run dev -- parse --input ./files/whatsapp-archive.zip --output ./output --exclude-media
+   ```
+
+   This command will exclude any media files from the output.
+
+### Output Directory
+
+The output directory should be a directory that you create in the root folder of your project, usually called `./output`.
+
+### Building and Running
+
+- **Build**: Compile TypeScript to JavaScript using:
+
+  ```bash
+  npm run build
+  ```
+
+- **Run**: Execute the compiled JavaScript code:
+
+  ```bash
+  npm run start -- parse --input ./files/whatsapp-archive.zip --output ./output
+  ```
+
+- **Development Mode**: Run the tool with TypeScript directly (without compiling first):
+
+  ```bash
+  npm run dev -- parse --input ./files/whatsapp-archive.zip --output ./output
+  ```
+
+### Testing
+
+Run unit tests using Jest:
+
+```bash
+npm run test
+```
+
+### Notes
+
+- If no `--me` option is provided, a default identifier will be used to generate a hash.
+- Media file validation uses `exiftool` to ensure all media files are readable and supported.
+- The `--convert-opus` option will convert `.opus` files to `.mp3` for easier playback.
+
+### License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
