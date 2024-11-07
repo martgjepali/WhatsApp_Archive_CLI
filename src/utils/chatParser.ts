@@ -2,6 +2,7 @@ import fs from "fs";
 import { createHash } from "crypto";
 import path from "path";
 import { convertOpusToMp3 } from "./convertOpusToMp3";
+import { validateMediaFile } from "./validateMediaFile";
 
 export type ChatMessage = {
   type: "msg" | "dchange" | "notification";
@@ -113,6 +114,14 @@ async function parseChatContent(
           outputPath,
           attachment.trim()
         );
+
+        const isValid = await validateMediaFile(originalAttachmentPath);
+        if (!isValid) {
+          console.warn(
+            `Invalid or unsupported media file: ${originalAttachmentPath}`
+          );
+          continue; // Skip to the next line if the file is not valid
+        }
 
         // Determine if the attachment is an Opus file
         const ext = path.extname(originalAttachmentPath).toLowerCase();
@@ -232,6 +241,14 @@ async function parseChatContent(
           outputPath,
           attachment.trim()
         );
+
+        const isValid = await validateMediaFile(originalAttachmentPath);
+        if (!isValid) {
+          console.warn(
+            `Invalid or unsupported media file: ${originalAttachmentPath}`
+          );
+          continue; // Skip to the next line if the file is not valid
+        }
 
         // Determine if the attachment is an Opus file
         const ext = path.extname(originalAttachmentPath).toLowerCase();
