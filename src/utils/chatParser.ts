@@ -29,7 +29,7 @@ export async function parseChatFile(
   isGroupChat: boolean,
   outputPath: string,
   convertOpus: boolean,
-  noMedia: boolean
+  excludeMedia: boolean
 ): Promise<ChatLog> {
   if (!fs.existsSync(filePath)) {
     throw new Error("Input file does not exist");
@@ -42,7 +42,7 @@ export async function parseChatFile(
     isGroupChat,
     outputPath,
     convertOpus,
-    noMedia
+    excludeMedia
   );
 }
 
@@ -52,7 +52,7 @@ async function parseChatContent(
   isGroupChat: boolean,
   outputPath: string,
   convertOpus: boolean,
-  noMedia: boolean
+  excludeMedia: boolean
 ): Promise<ChatLog> {
   const lines = content.split("\n");
   const chatMessages: ChatMessage[] = [];
@@ -102,6 +102,12 @@ async function parseChatContent(
 
       const attachmentMatch = normalizedLine.match(/<attached: (.+)>/);
       if (attachmentMatch) {
+        if (excludeMedia) {
+          console.log(
+            `Skipping attachment as excludeMedia is true: ${normalizedLine}`
+          );
+          continue; // Skip to the next line if media should be excluded
+        }
         const attachment = attachmentMatch[1];
         const originalAttachmentPath = path.resolve(
           outputPath,
@@ -216,6 +222,11 @@ async function parseChatContent(
     } else {
       const attachmentMatch = line.match(/<attached: (.+)>/);
       if (attachmentMatch) {
+        if (excludeMedia) {
+          console.log(`Skipping attachment as excludeMedia is true: ${line}`);
+          continue; // Skip to the next line if media should be excluded
+        }
+
         const attachment = attachmentMatch[1];
         const originalAttachmentPath = path.resolve(
           outputPath,

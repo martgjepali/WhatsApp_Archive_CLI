@@ -19,25 +19,42 @@ export function registerParseCommand(program: Command): void {
     )
     .option("-m, --me <hash>", "Specify your unique hash identifier")
     .option("-g, --group", "Indicate if the chat is a group chat", false)
-    .option("--convert-opus", "Convert OPUS files to MP3", false)
-    .option("--no-media", "Exclude media files from the saved output", false) // Add no-media option
     .option(
       "--convert-to <format>",
       "Output format: json, txt, or html",
       "json"
     )
+    .option("--convert-opus", "Convert OPUS files to MP3", false)
+    .option(
+      "--exclude-media",
+      "Exclude media files from the saved output",
+      false
+    ) // Renamed Option
+    .option("--test-flag", "Test if this flag works correctly", false)
     .addHelpText(
       "after",
       `
 Examples:
-  $ cli-tool parse --input ./chat.zip --output ./output --me <hash> --group --convert-opus --convert-to html --no-media
+  $ cli-tool parse --input ./chat.zip --output ./output --me <hash> --group --convert-opus --convert-to html --exclude-media
   $ cli-tool parse --input /path/to/chat.zip --output /path/to/output --convert-to txt
+  $ cli-tool parse --input ./chat.zip --output ./output --test-flag // NEW EXAMPLE FOR TEST FLAG
     `
     )
     .action(async (options) => {
       try {
+        // Debugging: Log all options to see what values are being received
+        console.log("Received options:", options);
+
         const inputPath = path.resolve(options.input);
         const outputPath = path.resolve(options.output);
+
+        // Debugging: Log paths to verify they are correct
+        console.log("Resolved input path:", inputPath);
+        console.log("Resolved output path:", outputPath);
+
+        // Debugging: Log the new flag to see if it is interpreted correctly
+        console.log("Resolved testFlag:", options.testFlag);
+        console.log("Resolved excludeMedia:", options.excludeMedia); // NEW DEBUGGING LINE
 
         if (!fs.existsSync(inputPath)) {
           console.error(
@@ -47,6 +64,7 @@ Examples:
         }
 
         if (!fs.existsSync(outputPath)) {
+          console.log(`Output path does not exist. Creating: ${outputPath}`);
           fs.mkdirSync(outputPath, { recursive: true });
         }
 
@@ -65,6 +83,15 @@ Examples:
           process.exit(1);
         }
 
+        // Debugging: Log values before calling parseChatFile
+        console.log("Calling parseChatFile with the following parameters:");
+        console.log("chatFile:", chatFile);
+        console.log("meHash:", options.me);
+        console.log("isGroupChat:", options.group);
+        console.log("outputPath:", outputPath);
+        console.log("convertOpus:", options.convertOpus);
+        console.log("excludeMedia:", options.excludeMedia); // Updated Debugging Line
+
         // Parse the chat file with the selected options
         const chatLog = await parseChatFile(
           chatFile,
@@ -72,11 +99,19 @@ Examples:
           options.group,
           outputPath,
           options.convertOpus,
-          options.noMedia
+          options.excludeMedia
         );
 
+        // Debugging: Log the parsed chatLog before saving
+        console.log("Parsed chatLog:", JSON.stringify(chatLog, null, 2));
+
         // Save the parsed output in the specified format
-        saveChatLog(chatLog, outputPath, options.convertTo);
+        saveChatLog(
+          chatLog,
+          outputPath,
+          options.convertTo,
+          options.excludeMedia
+        );
       } catch (error: unknown) {
         if (error instanceof Error) {
           console.error("Error processing the chat file:", error.message);
@@ -94,7 +129,8 @@ Examples:
 function saveChatLog(
   chatLog: ChatLog,
   outputPath: string,
-  format: string
+  format: string,
+  excludeMedia: boolean // Include the excludeMedia flag as a parameter
 ): void {
   const outputFilePath = path.join(outputPath, `chat.${format}`);
 
@@ -103,12 +139,13 @@ function saveChatLog(
     console.log(`Chat transcript saved to ${outputFilePath} in JSON format.`);
   } else if (format === "txt") {
     const textContent = chatLog.chatLog
-      .map((msg) => formatMessageForTxt(msg))
+      .filter((msg) => !excludeMedia || !msg.attachment) // Filter out media messages if excludeMedia is true
+      .map((msg) => formatMessageForTxt(msg, excludeMedia)) // Pass the excludeMedia flag
       .join("\n");
     fs.writeFileSync(outputFilePath, textContent, "utf8");
     console.log(`Chat transcript saved to ${outputFilePath} in TXT format.`);
   } else if (format === "html") {
-    const htmlContent = generateHtmlContent(chatLog);
+    const htmlContent = generateHtmlContent(chatLog, excludeMedia); // Pass the excludeMedia flag
     fs.writeFileSync(outputFilePath, htmlContent, "utf8");
     console.log(`Chat transcript saved to ${outputFilePath} in HTML format.`);
   } else {
@@ -119,33 +156,61 @@ function saveChatLog(
 }
 
 // Helper function to format message for TXT output
-function formatMessageForTxt(msg: ChatMessage): string {
+function formatMessageForTxt(msg: ChatMessage, excludeMedia: boolean): string {
   const dateStr = new Date(msg.tstamp * 1000).toLocaleString("en-US");
-
-  // Show only the file path for media attachments
-  let formattedMessage = msg.attachment
-    ? `${dateStr} - ${msg.person || ""}: ${msg.attachment}`
+  if (excludeMedia && msg.attachment) {
+    return `${dateStr} - ${msg.person || ""}: [Media file not saved]`;
+  }
+  return msg.attachment
+    ? `${dateStr} - ${msg.person || ""}: [Attachment] ${msg.attachment}`
     : `${dateStr} - ${msg.person || ""}: ${msg.message}`;
-
-  return formattedMessage;
 }
 
 // Helper function to generate HTML content
-function generateHtmlContent(chatLog: ChatLog): string {
+function generateHtmlContent(chatLog: ChatLog, excludeMedia: boolean): string {
   const messages = chatLog.chatLog
+    .filter((msg) => !excludeMedia || !msg.attachment) // Filter out media messages if excludeMedia is true
     .map((msg) => {
-      const dateStr = new Date(msg.tstamp * 1000).toLocaleString("en-US");
+      const dateStr = new Date(msg.tstamp * 1000).toLocaleDateString("en-US", {
+        year: "2-digit",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
 
       if (msg.attachment) {
-        // Show only the file path as the message content for attachments
-        return `<p><i>${dateStr}</i> - <b>${msg.person || ""}</b>: ${
-          msg.attachment
-        }</p>`;
-      }
+        const webFriendlyAttachmentPath = msg.attachment.replace(/\\/g, "/");
 
-      return `<p><i>${dateStr}</i> - <b>${msg.person || ""}</b>: ${
-        msg.message
-      }</p>`;
+        // Handle audio or image attachments
+        const isAudio = webFriendlyAttachmentPath.toLowerCase().endsWith(".mp3");
+        const isImage = webFriendlyAttachmentPath.toLowerCase().endsWith(".jpg") ||
+                        webFriendlyAttachmentPath.toLowerCase().endsWith(".jpeg") ||
+                        webFriendlyAttachmentPath.toLowerCase().endsWith(".png");
+
+        if (excludeMedia) {
+          return `<p><i>${dateStr}</i> - <b>${msg.person || ""}</b>: [Media file not saved]</p>`;
+        } else if (isAudio) {
+          return `
+          <figure>
+            <figcaption><i>${dateStr}</i> - <b>${msg.person || ""}</b></figcaption>
+            <audio controls><source src="${webFriendlyAttachmentPath}" type="audio/mpeg"></audio>
+          </figure>`;
+        } else if (isImage) {
+          return `
+          <figure>
+            <figcaption><i>${dateStr}</i> - <b>${msg.person || ""}</b></figcaption>
+            <img src="${webFriendlyAttachmentPath}" alt="${webFriendlyAttachmentPath}">
+          </figure>`;
+        } else {
+          // Generic attachment message if the media type is unknown
+          return `<p><i>${dateStr}</i> - <b>${msg.person || ""}</b>: [Attachment] ${webFriendlyAttachmentPath}</p>`;
+        }
+      } else {
+        // Regular message
+        return `<p><i>${dateStr}</i> - <b>${msg.person || ""}</b>: ${msg.message}</p>`;
+      }
     })
     .join("\n");
 
@@ -164,7 +229,7 @@ function generateHtmlContent(chatLog: ChatLog): string {
   `;
 }
 
-// Function to extract ZIP archive
+
 export function extractZipArchive(inputPath: string, outputPath: string): void {
   try {
     const zip = new AdmZip(inputPath);
@@ -180,7 +245,6 @@ export function extractZipArchive(inputPath: string, outputPath: string): void {
   }
 }
 
-// Function to find chat transcript in the output folder
 export function findChatTranscript(outputFolder: string): string | null {
   const files = fs.readdirSync(outputFolder);
   const chatFile = files.find((file) => file.endsWith(".txt"));
