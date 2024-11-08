@@ -38,7 +38,7 @@ export function registerParseCommand(program: Command): void {
       "Exclude media files from the saved output",
       false
     ) // Renamed Option
-    .option("--test-flag", "Test if this flag works correctly", false)
+    .option("--verbose", "Enable verbose logging for debugging", false)
     .addHelpText(
       "after",
       `
@@ -50,27 +50,33 @@ Examples:
     )
     .action(async (options) => {
       try {
+        const verboseLog = (message: string) => {
+          if (options.verbose) {
+            console.log(message);
+          }
+        };
+
         if (options.name) {
-          console.log(`Generating hash for name: ${options.name}`);
-          options.me = createMd5Hash(options.name);
-        } else if (!options.me) {
-          // If no hash or name is provided, use a default
-          console.warn("No name or hash provided, using a default identifier.");
-          options.me = createMd5Hash("default_user");
+          verboseLog(`Generating hash for name: ${options.name}`);
+          options.meHash = createMd5Hash(options.name);
+        } else {
+          // If no name is provided, use a default identifier
+          console.warn("No name provided, using a default identifier.");
+          options.meHash = createMd5Hash("default_user");
         }
 
-        console.log("Received options:", options);
+        verboseLog("Received options: " + JSON.stringify(options));
 
         const inputPath = path.resolve(options.input);
         const outputPath = path.resolve(options.output);
 
         // Debugging: Log paths to verify they are correct
-        console.log("Resolved input path:", inputPath);
-        console.log("Resolved output path:", outputPath);
+        verboseLog("Resolved input path: " + inputPath);
+        verboseLog("Resolved output path: " + outputPath);
 
         // Debugging: Log the new flag to see if it is interpreted correctly
-        console.log("Resolved testFlag:", options.testFlag);
-        console.log("Resolved excludeMedia:", options.excludeMedia); // NEW DEBUGGING LINE
+        verboseLog("Resolved testFlag: " + options.testFlag);
+        verboseLog("Resolved excludeMedia: " + options.excludeMedia); // NEW DEBUGGING LINE
 
         if (!fs.existsSync(inputPath)) {
           console.error(
@@ -92,34 +98,33 @@ Examples:
           process.exit(1);
         }
 
-        console.log(`Found chat transcript: ${chatFile}`);
+        verboseLog(`Found chat transcript: ${chatFile}`);
 
-        if (options.me && !validateMd5(options.me)) {
-          console.error("Error: The provided meHash is not a valid MD5 hash.");
+        if (options.meHash && !validateMd5(options.meHash)) {
+          console.error("Error: The generated meHash is not a valid MD5 hash.");
           process.exit(1);
         }
 
         // Debugging: Log values before calling parseChatFile
-        console.log("Calling parseChatFile with the following parameters:");
-        console.log("chatFile:", chatFile);
-        console.log("meHash:", options.me);
-        console.log("isGroupChat:", options.group);
-        console.log("outputPath:", outputPath);
-        console.log("convertOpus:", options.convertOpus);
-        console.log("excludeMedia:", options.excludeMedia); // Updated Debugging Line
+        verboseLog("Calling parseChatFile with the following parameters:");
+        verboseLog("chatFile: " + chatFile);
+        verboseLog("meHash: " + options.meHash);
+        verboseLog("outputPath: " + outputPath);
+        verboseLog("convertOpus: " + options.convertOpus);
+        verboseLog("excludeMedia: " + options.excludeMedia);
 
         // Parse the chat file with the selected options
         const chatLog = await parseChatFile(
           chatFile,
-          options.me,
-          options.group,
+          options.meHash,
+          true, // Assuming the new setup assumes group chats by default
           outputPath,
           options.convertOpus,
           options.excludeMedia
         );
 
         // Debugging: Log the parsed chatLog before saving
-        console.log("Parsed chatLog:", JSON.stringify(chatLog, null, 2));
+        verboseLog("Parsed chatLog: " + JSON.stringify(chatLog, null, 2));
 
         // Save the parsed output in the specified format
         saveChatLog(

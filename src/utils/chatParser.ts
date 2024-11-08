@@ -3,6 +3,8 @@ import { createHash } from "crypto";
 import path from "path";
 import { convertOpusToMp3 } from "./convertOpusToMp3";
 import { validateMediaFile } from "./validateMediaFile";
+import { checkFFmpegAvailability } from "./checkFFmpegAvailability";
+import moment from "moment";
 
 export type ChatMessage = {
   type: "msg" | "dchange" | "notification";
@@ -55,6 +57,15 @@ async function parseChatContent(
   convertOpus: boolean,
   excludeMedia: boolean
 ): Promise<ChatLog> {
+  if (convertOpus) {
+    const ffmpegAvailable = await checkFFmpegAvailability();
+    if (!ffmpegAvailable) {
+      throw new Error(
+        "The --convert-opus option is enabled, but ffmpeg is not available. Please install ffmpeg or disable the --convert-opus option."
+      );
+    }
+  }
+
   const lines = content.split("\n");
   const chatMessages: ChatMessage[] = [];
   let dayCache: string | null = null;
@@ -64,42 +75,27 @@ async function parseChatContent(
   let inferredChatName = isGroupChat ? "Group Chat" : "Personal Chat";
   let lastTimestamp = Math.floor(Date.now() / 1000); // Default to the current timestamp
 
-  // Update this regex based on your chat transcript's date format
-  const dateRegex =
-    /^\[(\d{1,2})[./-](\d{1,2})[./-](\d{2}|\d{4}), (\d{1,2}):(\d{2}):(\d{2})\]/;
+  const timestampFormat = "MM/DD/YY, HH:mm:ss"; // Adjust based on expected chat log format
 
   for (const line of lines) {
     console.log(`Processing line: ${line}`); // Diagnostic log
 
-    const match = line.match(dateRegex);
+    // Use moment to attempt parsing the timestamp
+    const timestampMatch = line.match(/^\[(.+?)\]/);
+    if (timestampMatch) {
+      const dateString = timestampMatch[1];
+      const parsedDate = moment(dateString, timestampFormat);
 
-    if (match) {
-      console.log(`Matched date: ${match[0]}`); // Diagnostic log
-
-      const [_, day, month, year, hour, minute, second] = match;
-      const fullYear = year.length === 2 ? `20${year}` : year;
-
-      const parsedDate = new Date(
-        `${fullYear}-${month.padStart(2, "0")}-${day.padStart(
-          2,
-          "0"
-        )}T${hour.padStart(2, "0")}:${minute.padStart(
-          2,
-          "0"
-        )}:${second.padStart(2, "0")}Z`
-      );
-
-      if (isNaN(parsedDate.getTime())) {
+      if (!parsedDate.isValid()) {
         console.warn(`Warning: Invalid date in line, skipping: ${line}`);
         continue;
       }
 
-      const timestamp = Math.floor(parsedDate.getTime() / 1000);
-      const normalizedLine = line.replace(dateRegex, "").trim();
+      const timestamp = Math.floor(parsedDate.toDate().getTime() / 1000);
+      const normalizedLine = line.replace(/^\[.+?\]/, "").trim();
 
       lastTimestamp = timestamp;
-
-      lastHour = `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+      lastHour = parsedDate.format("HH:mm");
 
       const attachmentMatch = normalizedLine.match(/<attached: (.+)>/);
       if (attachmentMatch) {
@@ -109,6 +105,7 @@ async function parseChatContent(
           );
           continue; // Skip to the next line if media should be excluded
         }
+
         const attachment = attachmentMatch[1];
         const originalAttachmentPath = path.resolve(
           outputPath,
@@ -123,13 +120,12 @@ async function parseChatContent(
           continue; // Skip to the next line if the file is not valid
         }
 
-        // Determine if the attachment is an Opus file
-        const ext = path.extname(originalAttachmentPath).toLowerCase();
-        let finalAttachmentPath = originalAttachmentPath;
-
-        if (ext === ".opus" && convertOpus) {
+        if (
+          path.extname(originalAttachmentPath).toLowerCase() === ".opus" &&
+          convertOpus
+        ) {
           // Define the path for the converted MP3 file
-          finalAttachmentPath = originalAttachmentPath.replace(
+          const finalAttachmentPath = originalAttachmentPath.replace(
             /\.opus$/i,
             ".mp3"
           );
@@ -150,10 +146,26 @@ async function parseChatContent(
             });
             continue;
           }
-        }
 
-        // Verify if the attachment file exists
-        if (fs.existsSync(finalAttachmentPath)) {
+          if (fs.existsSync(finalAttachmentPath)) {
+            chatMessages.push({
+              type: "msg",
+              index: msgIndex++,
+              tstamp: timestamp,
+              hour: lastHour,
+              person: lastPerson, // Use the last known sender
+              message: "Media file attached",
+              attachment: finalAttachmentPath,
+            });
+            console.log(
+              `Added message with attachment: ${finalAttachmentPath}`
+            );
+          } else {
+            console.warn(
+              `Warning: Attachment file not found at ${finalAttachmentPath}`
+            );
+          }
+        } else if (fs.existsSync(originalAttachmentPath)) {
           chatMessages.push({
             type: "msg",
             index: msgIndex++,
@@ -161,12 +173,14 @@ async function parseChatContent(
             hour: lastHour,
             person: lastPerson, // Use the last known sender
             message: "Media file attached",
-            attachment: finalAttachmentPath,
+            attachment: originalAttachmentPath,
           });
-          console.log(`Added message with attachment: ${finalAttachmentPath}`); // Diagnostic log
+          console.log(
+            `Added message with attachment: ${originalAttachmentPath}`
+          );
         } else {
           console.warn(
-            `Warning: Attachment file not found at ${finalAttachmentPath}`
+            `Warning: Attachment file not found at ${originalAttachmentPath}`
           );
           chatMessages.push({
             type: "msg",
@@ -175,7 +189,7 @@ async function parseChatContent(
             hour: lastHour,
             person: lastPerson,
             message: "Media file attached (file missing)",
-            attachment: finalAttachmentPath,
+            attachment: originalAttachmentPath,
           });
         }
       } else {
@@ -196,15 +210,8 @@ async function parseChatContent(
               type: "dchange",
               index: msgIndex++,
               tstamp: timestamp,
-              date: parsedDate.toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              }),
-              message: `Date changed to ${parsedDate.toLocaleDateString(
-                "en-US",
-                { year: "numeric", month: "long", day: "numeric" }
-              )}`,
+              date: parsedDate.format("MMMM D, YYYY"),
+              message: `Date changed to ${parsedDate.format("MMMM D, YYYY")}`,
             });
           }
 
@@ -217,7 +224,7 @@ async function parseChatContent(
             message: message,
             fromMe: fromMe,
           });
-          console.log(`Added message from ${person}: ${message}`); // Diagnostic log
+          console.log(`Added message from ${person}: ${message}`);
         } else {
           chatMessages.push({
             type: "notification",
@@ -225,7 +232,7 @@ async function parseChatContent(
             tstamp: timestamp,
             message: normalizedLine,
           });
-          console.log(`Added notification: ${normalizedLine}`); // Diagnostic log
+          console.log(`Added notification: ${normalizedLine}`);
         }
       }
     } else {
@@ -233,7 +240,7 @@ async function parseChatContent(
       if (attachmentMatch) {
         if (excludeMedia) {
           console.log(`Skipping attachment as excludeMedia is true: ${line}`);
-          continue; // Skip to the next line if media should be excluded
+          continue;
         }
 
         const attachment = attachmentMatch[1];
@@ -247,61 +254,69 @@ async function parseChatContent(
           console.warn(
             `Invalid or unsupported media file: ${originalAttachmentPath}`
           );
-          continue; // Skip to the next line if the file is not valid
+          continue;
         }
 
-        // Determine if the attachment is an Opus file
-        const ext = path.extname(originalAttachmentPath).toLowerCase();
-        let finalAttachmentPath = originalAttachmentPath;
-
-        if (ext === ".opus" && convertOpus) {
-          // Define the path for the converted MP3 file
-          finalAttachmentPath = originalAttachmentPath.replace(
+        if (
+          path.extname(originalAttachmentPath).toLowerCase() === ".opus" &&
+          convertOpus
+        ) {
+          const finalAttachmentPath = originalAttachmentPath.replace(
             /\.opus$/i,
             ".mp3"
           );
 
           try {
-            console.log(`Converting ${originalAttachmentPath} to MP3...`); // Diagnostic log
+            console.log(`Converting ${originalAttachmentPath} to MP3...`);
             await convertOpusToMp3(originalAttachmentPath, finalAttachmentPath);
-          } catch (conversionError: unknown) {
-            if (conversionError instanceof Error) {
-              console.error(`Conversion failed: ${conversionError.message}`);
-            } else {
-              console.error("An unknown error occurred during conversion.");
-            }
-            // Optionally, you can choose to skip adding this attachment or add it with an error message
+          } catch (conversionError) {
+            console.error(`Conversion failed: ${conversionError}`);
             chatMessages.push({
               type: "msg",
               index: msgIndex++,
               tstamp: lastTimestamp,
               hour: lastHour,
-              person: lastPerson, // Use the last known sender
+              person: lastPerson,
               message: "Media file attached (conversion failed)",
-              attachment: originalAttachmentPath, // Reference original if conversion failed
+              attachment: originalAttachmentPath,
             });
-            continue; // Skip to the next line
+            continue;
           }
 
-          // Optionally, remove the original .opus file after conversion
-          // fs.unlinkSync(originalAttachmentPath);
-        }
-
-        // Verify if the attachment file exists
-        if (fs.existsSync(finalAttachmentPath)) {
+          if (fs.existsSync(finalAttachmentPath)) {
+            chatMessages.push({
+              type: "msg",
+              index: msgIndex++,
+              tstamp: lastTimestamp,
+              hour: lastHour,
+              person: lastPerson,
+              message: "Media file attached",
+              attachment: finalAttachmentPath,
+            });
+            console.log(
+              `Added message with attachment: ${finalAttachmentPath}`
+            );
+          } else {
+            console.warn(
+              `Warning: Attachment file not found at ${finalAttachmentPath}`
+            );
+          }
+        } else if (fs.existsSync(originalAttachmentPath)) {
           chatMessages.push({
             type: "msg",
             index: msgIndex++,
             tstamp: lastTimestamp,
             hour: lastHour,
-            person: lastPerson, // Use the last known sender
+            person: lastPerson,
             message: "Media file attached",
-            attachment: finalAttachmentPath,
+            attachment: originalAttachmentPath,
           });
-          console.log(`Added message with attachment: ${finalAttachmentPath}`); // Diagnostic log
+          console.log(
+            `Added message with attachment: ${originalAttachmentPath}`
+          );
         } else {
           console.warn(
-            `Warning: Attachment file not found at ${finalAttachmentPath}`
+            `Warning: Attachment file not found at ${originalAttachmentPath}`
           );
           chatMessages.push({
             type: "msg",
@@ -310,7 +325,7 @@ async function parseChatContent(
             hour: lastHour,
             person: lastPerson,
             message: "Media file attached (file missing)",
-            attachment: finalAttachmentPath,
+            attachment: originalAttachmentPath,
           });
         }
       } else if (line.trim()) {
@@ -320,7 +335,7 @@ async function parseChatContent(
           tstamp: lastTimestamp,
           message: line.trim(),
         });
-        console.log(`Added notification: ${line.trim()}`); // Diagnostic log
+        console.log(`Added notification: ${line.trim()}`);
       }
     }
   }

@@ -61,6 +61,7 @@ npm run dev -- parse --input <path_to_zip> --output <output_directory> [options]
 - `--convert-opus`: Convert OPUS files to MP3 (default: `false`).
 - `--exclude-media`: Exclude media files from the saved output (default: `false`).
 - `--test-flag`: Test if this flag works correctly (default: `false`).
+- `--verbose`: Enable verbose logging for debugging (default: `false`).
 
 ### Examples
 
