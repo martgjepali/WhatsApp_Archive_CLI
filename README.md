@@ -53,6 +53,7 @@ npm run dev -- parse --input <path_to_zip> --output <output_directory> [options]
 
 ### Command Options
 
+- `parse` (required): Extract chat transcript and media files from a ZIP archive.
 - `--input <path>` (required): Path to the ZIP archive containing the chat transcript and media files.
 - `--output <path>` (required): Path to the output folder where the results will be saved.
 - `-m, --me <name>`: Specify your unique name. An MD5 hash will be automatically generated for identification purposes.
