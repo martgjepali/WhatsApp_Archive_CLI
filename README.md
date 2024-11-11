@@ -77,7 +77,7 @@ npm run dev -- parse --input <path_to_zip> --output <output_directory> [options]
 2. **Conversion to HTML**
 
    ```bash
-   npm run dev -- parse --input ./files/test_file.zip --output ./output --convert-to html
+   npm run dev -- parse --input ./files/test_file.zip --output ./output --me JohnDoe --convert-to html
    ```
 
    This command will extract the chat transcript and output it in HTML format.
@@ -85,7 +85,7 @@ npm run dev -- parse --input <path_to_zip> --output <output_directory> [options]
 3. **Exclude Media Files**
 
    ```bash
-   npm run dev -- parse --input ./files/test_file.zip --output ./output --exclude-media
+   npm run dev -- parse --input ./files/test_file.zip --output ./output --me JohnDoe --exclude-media
    ```
 
    This command will exclude any media files from the output.
@@ -105,13 +105,13 @@ The output directory should be a directory that you create in the root folder of
 - **Run**: Execute the compiled JavaScript code:
 
   ```bash
-  npm run start -- parse --input ./files/test_file.zip --output ./output
+  npm run start -- parse --input ./files/test_file.zip --output ./output --me JohnDoe
   ```
 
 - **Development Mode**: Run the tool with TypeScript directly (without compiling first):
 
   ```bash
-  npm run dev -- parse --input ./files/test_file.zip --output ./output
+  npm run dev -- parse --input ./files/test_file.zip --output ./output --me JohnDoe
   ```
 
 ### Testing
